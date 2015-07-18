@@ -48,7 +48,7 @@ import os.path
 import re
 import shlex
 import itertools
-
+from contextlib import contextmanager
 
 ENVIRONMENTS = [("ENV_OUTPUT", "BEAR_OUTPUT")]
 
@@ -68,7 +68,7 @@ def main():
         logging.getLogger().setLevel(to_logging_level(args.verbose))
         logging.debug(args)
 
-        if not args.build:
+        if not args.build and not args.trace_directory:
             parser.print_help()
             return 0
 
@@ -103,10 +103,19 @@ def run(args):
                     if os.path.exists(entry['file']) and not duplicate(entry))
         return commands
 
-    with TemporaryDirectory(prefix='bear-', dir=tempdir()) as tmpdir:
+    if args.trace_directory is not None:
+        if args.build:
+            tmpdir_context = NewDirectory(args.trace_directory)
+        else:
+            tmpdir_context = ExistingDirectory(args.trace_directory)
+    else:
+        tmpdir_context = TemporaryDirectory(prefix='bear-', dir=tempdir())
+
+    with tmpdir_context as tmpdir:
         # run the build command
-        exit_code = run_build(args.build, tmpdir, args.libear)
-        logging.debug('build finished with exit code: {0}'.format(exit_code))
+        if args.build:
+            exit_code = run_build(args.build, tmpdir, args.libear)
+            logging.debug('build finished with exit code: {0}'.format(exit_code))
         # read the intercepted exec calls
         commands = (parse_exec_trace(os.path.join(tmpdir, filename))
                     for filename
@@ -247,6 +256,17 @@ else:
                 rmtree(self.name)
 
 
+@contextmanager
+def NewDirectory(name):
+    if os.path.exists(name):
+        raise Exception, "directory already exists: " + name
+    os.mkdir(name)
+    yield name
+
+@contextmanager
+def ExistingDirectory(name):
+    yield name
+
 def duplicate_check(method):
     """ Predicate to detect duplicated entries.
 
@@ -312,6 +332,10 @@ def create_parser():
         default="@DEFAULT_PRELOAD_FILE@",
         action='store',
         help="""specify libear file location.""")
+
+    parser.add_argument(
+        '--trace-directory',
+        metavar='<dir>')
 
     parser.add_argument(
         dest='build',
