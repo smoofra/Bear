@@ -29,6 +29,10 @@ if (C99_SUPPORTED)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
 endif()
 
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -arch i386 -arch x86_64")
+endif()
+
 add_definitions(-D_GNU_SOURCE)
 list(APPEND CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE)
 
