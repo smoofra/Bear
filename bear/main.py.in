@@ -116,6 +116,8 @@ def run(args):
         if args.build:
             exit_code = run_build(args.build, tmpdir, args.libear)
             logging.debug('build finished with exit code: {0}'.format(exit_code))
+        else:
+            exit_code = 0
         # read the intercepted exec calls
         commands = (parse_exec_trace(os.path.join(tmpdir, filename))
                     for filename
