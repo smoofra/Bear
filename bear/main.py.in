@@ -261,11 +261,11 @@ def NewDirectory(name):
     if os.path.exists(name):
         raise Exception, "directory already exists: " + name
     os.mkdir(name)
-    yield name
+    yield os.path.abspath(name)
 
 @contextmanager
 def ExistingDirectory(name):
-    yield name
+    yield os.path.abspath(name)
 
 def duplicate_check(method):
     """ Predicate to detect duplicated entries.
