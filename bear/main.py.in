@@ -103,8 +103,15 @@ def capture(args):
         # do post processing
         entries = post_processing(itertools.chain.from_iterable(commands))
         # dump the compilation database
-        with open(args.cdb, 'w+') as handle:
-            json.dump(list(entries), handle, sort_keys=True, indent=4)
+        cdb_new = args.cdb + ".new"
+        try:
+            with open(cdb_new, "w+") as handle:
+                json.dump(list(entries), handle, sort_keys=True, indent=4)
+            os.rename(cdb_new, args.cdb)
+        finally:
+            if os.path.exists(cdb_new):
+                os.unlink(cdb_new)
+
         return exit_code
 
 
