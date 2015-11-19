@@ -45,7 +45,7 @@ import os.path
 import re
 import shlex
 import itertools
-
+from contextlib import contextmanager
 
 def main():
     try:
@@ -56,7 +56,7 @@ def main():
         logging.getLogger().setLevel(to_logging_level(args.verbose))
         logging.debug(args)
 
-        if not args.build:
+        if not args.build and not args.trace_directory:
             parser.print_help()
             return 0
 
@@ -91,12 +91,23 @@ def capture(args):
                     if os.path.exists(entry['file']) and not duplicate(entry))
         return commands
 
-    with TemporaryDirectory(prefix='bear-', dir=tempdir()) as tmpdir:
+    if args.trace_directory is not None:
+        if args.build:
+            tmpdir_context = NewDirectory(args.trace_directory)
+        else:
+            tmpdir_context = ExistingDirectory(args.trace_directory)
+    else:
+        tmpdir_context = TemporaryDirectory(prefix='bear-', dir=tempdir())
+
+    with tmpdir_context as tmpdir:
         # run the build command
-        environment = setup_environment(tmpdir, args.libear)
-        logging.info('run build in environment: %s', environment)
-        exit_code = subprocess.call(args.build, env=environment)
-        logging.info('build finished with exit code: %s', exit_code)
+        if args.build:
+            environment = setup_environment(tmpdir, args.libear)
+            logging.info('run build in environment: %s', environment)
+            exit_code = subprocess.call(args.build, env=environment)
+            logging.info('build finished with exit code: %s', exit_code)
+        else:
+            exit_code = 0
         # read the intercepted exec calls
         commands = (parse_exec_trace(os.path.join(tmpdir, filename))
                     for filename in sorted(os.listdir(tmpdir)))
@@ -292,6 +303,17 @@ else:
                 rmtree(self.name)
 
 
+@contextmanager
+def NewDirectory(name):
+    if os.path.exists(name):
+        raise Exception, "directory already exists: " + name
+    os.mkdir(name)
+    yield os.path.abspath(name)
+
+@contextmanager
+def ExistingDirectory(name):
+    yield os.path.abspath(name)
+
 def duplicate_check(method):
     """ Predicate to detect duplicated entries.
 
@@ -358,6 +380,10 @@ def create_parser():
         default="@DEFAULT_PRELOAD_FILE@",
         action='store',
         help="""specify libear file location.""")
+
+    parser.add_argument(
+        '--trace-directory',
+        metavar='<dir>')
 
     parser.add_argument(
         dest='build',
